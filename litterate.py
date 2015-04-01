@@ -23,8 +23,8 @@ delimiters and outputs it on stdout.
 """
 
 """{{{
-#  Litterate.py
-## A multi-language litterate programming tool
+# Litterate.py
+# A multi-language litterate programming tool
 
 ```
 Version :  ${VERSION}
@@ -82,7 +82,6 @@ $ litterate.py a.py b.py | pandoc -f markdown -t html README.html
 # -----------------------------------------------------------------------------
 
 """{{{
-
 Commands
 --------
 
@@ -145,13 +144,11 @@ COMMANDS = {
 # {{{CUT:API}}}
 
 """{{{
-
 API
 ---
 
 The language class defines how "litterate" strings are extracted from the
 source file.
-
 }}}"""
 
 class Language(object):
@@ -196,11 +193,14 @@ class Language(object):
 			t = "".join((_ for _ in strip.split(t) if _ is not None))
 			for old, new in escape: t = t.replace(old, new)
 			command = self.command(t)
-			if self.newlines and len(block) > 0 and not RE_EMPTY.match(t):
-				block.append("\n")
 			if not command:
-				if not self.strip or len(block) > 0 or not RE_EMPTY.match(t):
-					block.append(t)
+				# If we have the strip option, we absorb the leading newline
+				if self.strip   and len(block) == 0 and t[0] == "\n": t = t[1:]
+				# If we have the newlines options, and the block is not empty, ends with a string,
+				# which is not the empty string, then we add it.
+				if self.newlines and i > 0 and len(block) > 0 and type(block[-1]) in (str, unicode) and not RE_EMPTY.match(block[-1]): block.append("\n")
+				#if not self.strip or len(block) > 0 or not RE_EMPTY.match(t):
+				block.append(t)
 			elif command[0] == "CUT":
 				block = blocks.setdefault(command[1], [])
 			elif command[0] == "END":
@@ -217,12 +217,8 @@ class Language(object):
 		last_line = None
 		for i, line in enumerate(block):
 			if type(line) in (str, unicode):
-				if not self.strip or i != last or not RE_EMPTY.match(line):
-					last_line = line
-					yield line
+				yield line
 			elif line[0] == "PASTE":
-				if self.newlines and not last_line or not RE_EMPTY.match(last_line):
-					yield "\n"
 				for _ in self._output( blocks[line[1]], blocks):
 					yield _
 
@@ -278,7 +274,6 @@ class JavaScript(C):
 	pass
 
 """{{{
-
 Python
 ======
 
@@ -302,19 +297,18 @@ the input stream.
 
 if True:
 	\"\"\"{{{
-	| You can get an iterator on a file by doing:
-
-	| ```c
-	| Iterator* iterator = Iterator_Open("example.txt");
-	| ```
-	\}\}\}\"\"\"
-
+#	| You can get an iterator on a file by doing:
+#	|
+#	| ```c
+#	| Iterator* iterator = Iterator_Open("example.txt");
+#	| ```
+ 	\}\}\}\"\"\"
 ```
-
 }}}"""
+
 class Python(Language):
 	RE_START = re.compile("{{{")
-	RE_STRIP = re.compile("\s*#\s*|[ \t]\|[ \t]?")
+	RE_STRIP = re.compile("[ \t]\|[ \t]?|^[ \t]#")
 	RE_END   = re.compile("\s*\#?\s*}}}")
 	ESCAPE   = (
 		("\\}\\}\\}", "}}}"),
