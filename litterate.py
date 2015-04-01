@@ -57,8 +57,7 @@ In Python, they look like this
 ```
 \"\"\"{{{
 <TEXT THAT WILL BE EXTRACTED>
-}}}\"\"\"
-
+\}\}\}\"\"\"
 ```
 
 The extracted text will then be output to stdout (or to a specific file using
@@ -144,6 +143,7 @@ COMMANDS = {
 # {{{CUT:API}}}
 
 """{{{
+
 API
 ---
 
@@ -185,7 +185,7 @@ class Language(object):
 			e = end.search(text, s.end())
 			if not e: continue
 			t = text[s.end():e.start()]
-			t = "".join(strip.split(t))
+			t = "".join((_ for _ in strip.split(t) if _ is not None))
 			command = self.command(t)
 			if not command:
 				block.append(t)
@@ -258,7 +258,7 @@ class JavaScript(C):
 """{{{
 
 Python
-=============
+======
 
 The recognized extensions are `.py`. Litterate texts
 start with `{{{` and end with `}}}`. Any line starting with `|` (leading and
@@ -292,7 +292,7 @@ if True:
 }}}"""
 class Python(Language):
 	RE_START = re.compile("{{{")
-	RE_STRIP = re.compile("\s*#\s*|[ \t]\|[ \t]?")
+	RE_STRIP = re.compile("(\s*#\s*)|([ \t]\|[ \t]?)")
 	RE_END   = re.compile("\s*\#?\s*}}}")
 
 """{{{
@@ -370,6 +370,7 @@ if __name__ == "__main__":
 
 	# {{{CUT:COMMAND_LINE}}}
 	"""{{{
+	|
 	| Command-line tool
 	| -----------------
 	|
@@ -401,14 +402,14 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 	output = None
 	if args.output:
-		output = file(p)
+		output = file(args.output, "w")
 	out = output or out
 	# Executes the main program
 	if not args.files or args.files == ["-"]:
 
 		out.write(extract(sys.stdin.read(), start, end, strip))
 	else:
-		for p in args:
+		for p in args.files:
 			language = args.language or getLanguage(p)
 			assert language, "No language registered for file: {0}. Supported extensions are {1}".format(p, ", ".join(LANGUAGES.keys()))
 			with file(p) as f:
