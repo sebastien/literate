@@ -102,6 +102,8 @@ For instance:
 */
 ```
 
+The *available commands* are the following:
+
 `CUT:<NAME>`::
 	`CUT` will not output any following litterate text until another
 	`CUT` command or a corresponding `END` command is encountered.
@@ -121,7 +123,6 @@ with an UPPER CASE letter or digit. That's a bit restrictive, but it makes
 it easier to highlight and spot in your source code.
 }}}"""
 
-RE_EMPTY         = re.compile("^\s+$")
 RE_COMMAND_PASTE = re.compile("(PASTE):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
 RE_COMMAND_CUT   = re.compile("(CUT):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
 RE_COMMAND_END   = re.compile("(END):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
@@ -133,6 +134,7 @@ COMMANDS = {
 
 
 # {{{PASTE:COMMAND_LINE}}}
+
 # {{{PASTE:API}}}
 
 # -----------------------------------------------------------------------------
@@ -186,20 +188,23 @@ class Language(object):
 		escape = escape or self.ESCAPE
 		block  = []
 		blocks = {"MAIN":block}
+		last_end = -1
 		for i, s in enumerate(start.finditer(text)):
 			e = end.search(text, s.end())
-			if not e: continue
-			t = text[s.end():e.start()]
-			t = "".join((_ for _ in strip.split(t) if _ is not None))
+			# If we did not find an end, or that we found a start before the last
+			# end, then we continue.
+			if not e or s.end() < last_end: continue
+			last_end = e.end()
+			t        = text[s.end():e.start()]
+			t        = "".join((_ for _ in strip.split(t) if _ is not None))
 			for old, new in escape: t = t.replace(old, new)
 			command = self.command(t)
 			if not command:
 				# If we have the strip option, we absorb the leading newline
-				if self.strip   and len(block) == 0 and t[0] == "\n": t = t[1:]
+				if self.strip and i == 0 and len(block) == 0 and t[0] == "\n": t = t[1:]
 				# If we have the newlines options, and the block is not empty, ends with a string,
 				# which is not the empty string, then we add it.
-				if self.newlines and i > 0 and len(block) > 0 and type(block[-1]) in (str, unicode) and not RE_EMPTY.match(block[-1]): block.append("\n")
-				#if not self.strip or len(block) > 0 or not RE_EMPTY.match(t):
+				if self.newlines and i > 0 and len(block) > 0 and type(block[-1]) in (str, unicode) and not block[-1][-1] == "\n": block.append("\n")
 				block.append(t)
 			elif command[0] == "CUT":
 				block = blocks.setdefault(command[1], [])
@@ -307,11 +312,11 @@ if True:
 }}}"""
 
 class Python(Language):
-	RE_START = re.compile("{{{")
+	RE_START = re.compile("\{\{\{")
 	RE_STRIP = re.compile("[ \t]\|[ \t]?|^[ \t]#")
-	RE_END   = re.compile("\s*\#?\s*}}}")
+	RE_END   = re.compile("\s*\#?\s*}}"  "}")
 	ESCAPE   = (
-		("\\}\\}\\}", "}}}"),
+		("\\}\\}\\}", "}" "}}"),
 		('\\"\\"\\"', '"""')
 	)
 
@@ -335,7 +340,7 @@ Example:
 # iterator's offset. The iterator will build a buffer of the acquired input
 # and maintain a pointer for the current offset within the data acquired from
 # the input stream.
-# }}}
+# \}\}\}
 
 if True
 	# {{{
