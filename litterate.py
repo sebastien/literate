@@ -16,8 +16,8 @@ LICENSE = "http://ffctn.com/doc/licenses/bsd"
 
 import re
 
-__version__ = "0.0.0"
-__doc__ = """
+__version__ = VERSION
+__doc__     = """
 A small litterate-programming tool that extracts and strips text within comment
 delimiters and outputs it on stdout.
 """
@@ -82,6 +82,7 @@ $ litterate.py a.py b.py | pandoc -f markdown -t html README.html
 # -----------------------------------------------------------------------------
 
 """{{{
+
 Commands
 --------
 
@@ -121,6 +122,7 @@ with an UPPER CASE letter or digit. That's a bit restrictive, but it makes
 it easier to highlight and spot in your source code.
 }}}"""
 
+RE_EMPTY         = re.compile("^\s+$")
 RE_COMMAND_PASTE = re.compile("(PASTE):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
 RE_COMMAND_CUT   = re.compile("(CUT):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
 RE_COMMAND_END   = re.compile("(END):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
@@ -154,9 +156,14 @@ source file.
 
 class Language(object):
 
-	RE_START = None
-	RE_END   = None
-	RE_STRIP = None
+	RE_START      = None
+	RE_END        = None
+	RE_STRIP      = None
+	ESCAPE        = [None, None]
+
+	def __init__( self, options ):
+		self.newlines = options and options.newlines or True
+		self.strip    = options and options.strip    or True
 
 	def command( self, text ):
 		"""Returns a couple `(command:String, argument:String)` if the
@@ -166,7 +173,7 @@ class Language(object):
 			if m: return m.group(1), m.group(2)
 		return None
 
-	def extract( self, text, start=None, end=None, strip=None ):
+	def extract( self, text, start=None, end=None, strip=None, escape=None ):
 		"""Extracts litterate string from the given text, using
 		the given `start`, `end` and `strip` regular expressions.
 
@@ -176,19 +183,24 @@ class Language(object):
 		  a litterate text line.
 
 		"""
-		start  = start or self.RE_START
-		end    = end   or self.RE_END
-		strip  = strip or self.RE_STRIP
+		start  = start  or self.RE_START
+		end    = end    or self.RE_END
+		strip  = strip  or self.RE_STRIP
+		escape = escape or self.ESCAPE
 		block  = []
 		blocks = {"MAIN":block}
-		for s in start.finditer(text):
+		for i, s in enumerate(start.finditer(text)):
 			e = end.search(text, s.end())
 			if not e: continue
 			t = text[s.end():e.start()]
 			t = "".join((_ for _ in strip.split(t) if _ is not None))
+			for old, new in escape: t = t.replace(old, new)
 			command = self.command(t)
+			if self.newlines and len(block) > 0 and not RE_EMPTY.match(t):
+				block.append("\n")
 			if not command:
-				block.append(t)
+				if not self.strip or len(block) > 0 or not RE_EMPTY.match(t):
+					block.append(t)
 			elif command[0] == "CUT":
 				block = blocks.setdefault(command[1], [])
 			elif command[0] == "END":
@@ -201,10 +213,16 @@ class Language(object):
 			yield _
 
 	def _output( self, block, blocks ):
-		for line in block:
+		last      = len(block)
+		last_line = None
+		for i, line in enumerate(block):
 			if type(line) in (str, unicode):
-				yield line
+				if not self.strip or i != last or not RE_EMPTY.match(line):
+					last_line = line
+					yield line
 			elif line[0] == "PASTE":
+				if self.newlines and not last_line or not RE_EMPTY.match(last_line):
+					yield "\n"
 				for _ in self._output( blocks[line[1]], blocks):
 					yield _
 
@@ -216,6 +234,9 @@ class Language(object):
 
 # {{{CUT:LANGUAGES}}}
 """{{{
+
+Supported Languages
+-------------------
 
 C, C++ & JavaScript
 ===================
@@ -245,9 +266,10 @@ Example:
 
 }}}"""
 class C(Language):
-	RE_START = re.compile("/\*\*")
-	RE_END   = re.compile("\*/")
-	RE_STRIP = re.compile("[ \t]*\*[ \t]?")
+	RE_START      = re.compile("/\*\*")
+	RE_END        = re.compile("\*/")
+	RE_STRIP      = re.compile("[ \t]*\*[ \t]?")
+	ESCAPE        = (("\\*\\/", "*/"),)
 
 class C(Language):
 	pass
@@ -261,13 +283,13 @@ Python
 ======
 
 The recognized extensions are `.py`. Litterate texts
-start with `{{{` and end with `}}}`. Any line starting with `|` (leading and
+start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
 trailng spaces) will be stripped.
 
 Example:
 
 ```
-# {{{CUT:ABOUT}}}
+# {{{CUT:ABOUT\}\}\}
 
 \"\"\"{{{
 Input data is acquired through _iterators_. Iterators wrap an input source
@@ -275,7 +297,7 @@ Input data is acquired through _iterators_. Iterators wrap an input source
 iterator's offset. The iterator will build a buffer of the acquired input
 and maintain a pointer for the current offset within the data acquired from
 the input stream.
-}}}\"\"\"
+\}\}\}\"\"\"
 
 
 if True:
@@ -285,15 +307,19 @@ if True:
 	| ```c
 	| Iterator* iterator = Iterator_Open("example.txt");
 	| ```
-	}}}\"\"\"
+	\}\}\}\"\"\"
 
 ```
 
 }}}"""
 class Python(Language):
 	RE_START = re.compile("{{{")
-	RE_STRIP = re.compile("(\s*#\s*)|([ \t]\|[ \t]?)")
+	RE_STRIP = re.compile("\s*#\s*|[ \t]\|[ \t]?")
 	RE_END   = re.compile("\s*\#?\s*}}}")
+	ESCAPE   = (
+		("\\}\\}\\}", "}}}"),
+		('\\"\\"\\"', '"""')
+	)
 
 """{{{
 
@@ -301,13 +327,13 @@ Sugar
 =====
 
 The recognized extensions are `.sjs` and `.spy`. Litterate texts
-start with `{{{` and end with `}}}`. Any line starting with `|` (leading and
+start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
 trailng spaces) will be stripped.
 
 Example:
 
 ```
-# {{{CUT:ABOUT}}}
+# {{{CUT:ABOUT\}\}\}
 
 # {{{
 # Input data is acquired through _iterators_. Iterators wrap an input source
@@ -324,7 +350,7 @@ if True
 	# ```c
 	# Iterator* iterator = Iterator_Open("example.txt");
 	# ```
-	# }}}
+	# \}\}\}
 end
 ```
 
@@ -353,11 +379,11 @@ litterate.getLanguage(filename:String)::
 	Returns the `Language` instance that corresponds to the given extension.
 }}}
 """
-def getLanguage( filename ):
+def getLanguage( filename, args ):
 	ext = filename.rsplit(".", 1)[-1]
 	for pattern, parser in LANGUAGES.items():
 		if re.match(pattern, ext):
-			return parser()
+			return parser(args)
 	return None
 
 # -----------------------------------------------------------------------------
@@ -367,7 +393,13 @@ def getLanguage( filename ):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-
+	import sys, argparse
+	def fail( message ):
+		sys.stderr.write("[!] ")
+		sys.stderr.write(message)
+		sys.stderr.write("\n")
+		sys.stderr.flush()
+		return sys.exit(-1)
 	# {{{CUT:COMMAND_LINE}}}
 	"""{{{
 	|
@@ -388,17 +420,23 @@ if __name__ == "__main__":
 	|
 	| - `-o=PATH` will output the resulting text to the given file. By default,
 	|   the extracted text is printed on stdout.
-
+	|
+	| - `-n, `--newlines` will ensure that the blocks are always separated by
+	|   newlines (default is ON)
+	|
+	| - `-s, `--strip` will strip leading and trailing spaces/newlines
+	|   from the output (default is ON)
 	| }}}"""
-	import sys, argparse
 	out  = sys.stdout
 	# Parses the arguments
 	parser = argparse.ArgumentParser(
 		description="Extracts selected text from source code to create documentation files."
 	)
-	parser.add_argument("files", metavar="FILE", type=str, nargs="+", help="Source files to be processed. Stdin is denoted by `-`")
+	parser.add_argument("files", metavar="FILE", type=str, nargs="*", help="Source files to be processed. Stdin is denoted by `-`")
 	parser.add_argument("-l", "--language", dest="language", action="store", help="Enforces the given language for the input file. If empty, lists the available languages")
-	parser.add_argument("-o", "--output", dest="output", action="store", help="Specifies an input file, stdout is denoted by -")
+	parser.add_argument("-o", "--output",   dest="output",   action="store", help="Specifies an input file, stdout is denoted by -")
+	parser.add_argument("-n", "--newlines", dest="newlines", action="store_true", default=True, help="Ensures that blocks are separated by newlines")
+	parser.add_argument("-s", "--strip",    dest="strip",    action="store_true", default=True, help="Strips leading and trailing newlines")
 	args = parser.parse_args()
 	output = None
 	if args.output:
@@ -406,11 +444,12 @@ if __name__ == "__main__":
 	out = output or out
 	# Executes the main program
 	if not args.files or args.files == ["-"]:
-
-		out.write(extract(sys.stdin.read(), start, end, strip))
+		if not args.language:
+			fail("A language (-l, --language) must be specified when using stdin. Try -lc")
+		out.write(getLanguage(args.language, args).extract(sys.stdin.read()))
 	else:
 		for p in args.files:
-			language = args.language or getLanguage(p)
+			language = args.language or getLanguage(p, args)
 			assert language, "No language registered for file: {0}. Supported extensions are {1}".format(p, ", ".join(LANGUAGES.keys()))
 			with file(p) as f:
 				for line in language.extract(f.read()):
