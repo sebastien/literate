@@ -24,21 +24,26 @@ delimiters and outputs it on stdout.
 
 """{{{
 # Litterate.py
-# A multi-language litterate programming tool
+## A multi-language litterate programming tool
 
 ```
-Version :  ${VERSION}
+Version :  0.0.1
 URL     :  http://github.com/sebastien/litterate.py
 ```
 
-`Litterate.py` helps you keep your code/API documentation along with the source
-file. It is intended for small-sized projects where you would prefer to avoid
+`litterate.py` extract documentation embedded in source-code files, allowing
+to have both project documentation and source code in the same file.
+
+It is intended for small-sized projects where you would prefer to avoid
 having the documentation and the code separate.
 
-How does it work?
------------------
+It can also be used as a litterate programming tool where you have the source
+code presented alongside explanations.
 
-`Litterate.py` will look for specific delimiters in your source code and
+How does it work?
+=================
+
+`litterate.py` will look for specific delimiters in your source files and
 extract the content content between these delimiters. The delimiters depend
 on the language you're using.
 
@@ -61,8 +66,8 @@ In Python, they look like this
 ```
 
 The extracted text will then be output to stdout (or to a specific file using
-the `-o` command line option). This lets you choose any specific format for
-the text -- I personnaly use Markdown, but you could use ReST or even XML.
+the `-o` command line option). You're then free to process the output
+with a tool such as `pandoc` to format it to a more readable format.
 
 A typical workflow would be like that
 
@@ -72,8 +77,10 @@ $ litterate.py a.py b.py | pandoc -f markdown -t html README.html
 
 }}}"""
 
-
+# {{{PASTE:COMMAND_LINE}}}
 # {{{PASTE:LANGUAGES}}}
+# {{{PASTE:COMMANDS}}}
+# {{{PASTE:API}}}
 
 # -----------------------------------------------------------------------------
 #
@@ -81,9 +88,12 @@ $ litterate.py a.py b.py | pandoc -f markdown -t html README.html
 #
 # -----------------------------------------------------------------------------
 
+# {{{CUT:COMMANDS}}}
+
 """{{{
+
 Commands
---------
+========
 
 One of the typical problem you'll encounter when adding documentation in your
 source code is that the source ordering of elements (functions, classes, etc)
@@ -94,12 +104,18 @@ on the output.
 To do that, `litterate.py` provides you with a few useful commands, which
 need to be the only content of a litterate text to be interpreted.
 
-For instance:
+For instance, in C/JavaScript:
 
 ```
 /**
   * CUT:ABOUT
 */
+```
+
+or in Python/Sugar:
+
+```
+# {{{CUT:ABOUT\}\}\}
 ```
 
 The *available commands* are the following:
@@ -123,41 +139,68 @@ with an UPPER CASE letter or digit. That's a bit restrictive, but it makes
 it easier to highlight and spot in your source code.
 }}}"""
 
-RE_COMMAND_PASTE = re.compile("(PASTE):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
-RE_COMMAND_CUT   = re.compile("(CUT):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
-RE_COMMAND_END   = re.compile("(END):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
+RE_COMMAND_PASTE    = re.compile("(PASTE):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
+RE_COMMAND_CUT      = re.compile("(CUT):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
+RE_COMMAND_END      = re.compile("(END):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
+RE_COMMAND_VERBATIM = re.compile("(VERBATIM):(START|END)")
+
 COMMANDS = {
 	"PASTE": RE_COMMAND_PASTE,
 	"CUT"  : RE_COMMAND_CUT,
 	"END"  : RE_COMMAND_END,
+	"VERBATIM" : RE_COMMAND_VERBATIM
 }
 
 
-# {{{PASTE:COMMAND_LINE}}}
-
-# {{{PASTE:API}}}
 
 # -----------------------------------------------------------------------------
 #
-# LANGUAGES
+# LANGUAGES/API
 #
 # -----------------------------------------------------------------------------
 
 # {{{CUT:API}}}
 
 """{{{
-API
----
 
-The language class defines how "litterate" strings are extracted from the
-source file.
+API
+===
+
+You can import `litterate` as a module from Python directly, and use it
+to extract litterate text from files/text.
+
+The module defines ready-made language parsers:
+
+- `litterate.C`, `litterate.JavaScript` for C-like languages
+- `litterate.Python`, `litterate.Sugar` for Pythonic languages
+
+You can also subclass the `litterate.Language`, in particular:
+
 }}}"""
 
 class Language(object):
 
+	# {{{
+	# `Language.RE_START:regexp`::
+	# 	The regular expression that is used to match start delimiters
+	# }}}
 	RE_START      = None
+	# {{{
+	# `Language.RE_END:regexp`::
+	# 	The regular expression that is used to match end delimiters
+	# }}}
 	RE_END        = None
+	# {{{
+	# `Language.RE_STRIP:regexp`::
+	# 	The regular expression that is used to strip pieces such as leading
+	#   `#` characters.
+	# }}}
 	RE_STRIP      = None
+	# {{{
+	# `Language.ESCAPE=[(old:String,new:String)]`
+	#	A list of `old` strings to be replaced by `new` strings, which is
+	#	a very basic way of dealing with excaping delimiters.
+	# }}}
 	ESCAPE        = [None, None]
 
 	def __init__( self, options ):
@@ -172,6 +215,12 @@ class Language(object):
 			if m: return m.group(1), m.group(2)
 		return None
 
+	# {{{
+	# `Language.extract( self, text:String )`::
+	#	The main algorithm that extracts the litterate text blocks from the
+	#	source files.
+	# }}}
+
 	def extract( self, text, start=None, end=None, strip=None, escape=None ):
 		"""Extracts litterate string from the given text, using
 		the given `start`, `end` and `strip` regular expressions.
@@ -182,6 +231,8 @@ class Language(object):
 		  a litterate text line.
 
 		"""
+		# {{{```}}}
+		# {{{VERBATIM:START}}}
 		start  = start  or self.RE_START
 		end    = end    or self.RE_END
 		strip  = strip  or self.RE_STRIP
@@ -189,17 +240,20 @@ class Language(object):
 		block  = []
 		blocks = {"MAIN":block}
 		last_end = -1
+		verbatim = None
 		for i, s in enumerate(start.finditer(text)):
 			e = end.search(text, s.end())
 			# If we did not find an end, or that we found a start before the last
 			# end, then we continue.
 			if not e or s.end() < last_end: continue
-			last_end = e.end()
 			t        = text[s.end():e.start()]
 			t        = "".join((_ for _ in strip.split(t) if _ is not None))
 			for old, new in escape: t = t.replace(old, new)
 			command = self.command(t)
+			# {{{TODO:It should still be possible to insert litterate text here}}}
 			if not command:
+				if verbatim:
+					block.append(text[max(verbatim,last_end):s.start()])
 				# If we have the strip option, we absorb the leading newline
 				if self.strip and i == 0 and len(block) == 0 and t[0] == "\n": t = t[1:]
 				# If we have the newlines options, and the block is not empty, ends with a string,
@@ -212,10 +266,20 @@ class Language(object):
 				block = blocks["MAIN"]
 			elif command[0] == "PASTE":
 				block.append(command)
+			elif command[0] == "VERBATIM":
+				if command[1] == "START":
+					verbatim = e.end()
+				else:
+					# TODO: We should de-indent for Pythonic languages
+					block.append(text[max(verbatim,last_end):s.start()])
+					verbatim = None
 			else:
 				raise Exception("Unsupported command: " + t)
+			last_end = e.end()
 		for _ in self._output(blocks["MAIN"], blocks):
 			yield _
+		# {{{VERBATIM:END}}}
+		# {{{```}}}
 
 	def _output( self, block, blocks ):
 		last      = len(block)
@@ -237,10 +301,10 @@ class Language(object):
 """{{{
 
 Supported Languages
--------------------
+===================
 
 C, C++ & JavaScript
-===================
+-------------------
 
 The recognized extensions are `.c`, `.cpp`, `.h` and `.js`. Litterate texts
 start with `/**` and end with `*/`. Any line starting with `*` (leading and
@@ -280,7 +344,7 @@ class JavaScript(C):
 
 """{{{
 Python
-======
+------
 
 The recognized extensions are `.py`. Litterate texts
 start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
@@ -323,7 +387,7 @@ class Python(Language):
 """{{{
 
 Sugar
-=====
+-----
 
 The recognized extensions are `.sjs` and `.spy`. Litterate texts
 start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
@@ -357,6 +421,23 @@ end
 
 class Sugar(Python):
 	pass
+
+"""{{{
+
+A note about escaping
+---------------------
+
+Your source code might contain the delimiters as part of regular code, most
+likely within strings. If this is the case you should try to write them diffently,
+either by using escape symbols (such as `\`) or by breaking the string in bits (
+in Python you could do `"{{" "{"` which would return a string equivalent to
+the start delimiter).
+
+If you'd like to represent a delimiter within a litterate text, you only have
+to worry about the end delimiter. The convention is to write the delimiter
+with each character prefixed by a `\`.
+
+}}}"""
 
 # {{{END:LANGUAGES}}}
 
@@ -403,7 +484,7 @@ if __name__ == "__main__":
 	"""{{{
 	|
 	| Command-line tool
-	| -----------------
+	| =================
 	|
 	| `litterate.py` can be executed as a command-line tool.
 	|
