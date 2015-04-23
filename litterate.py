@@ -6,15 +6,14 @@
 # License           : BSD License
 # -----------------------------------------------------------------------------
 # Creation date     : 02-Mar-2015
-# Last modification : 01-Apr-2015
+# Last modification : 23-Apr-2015
 # -----------------------------------------------------------------------------
 
-VERSION = "0.0.0"
+import re
+
+VERSION = "0.1.1"
 LICENSE = "http://ffctn.com/doc/licenses/bsd"
 
-# EOF - vim: ts=4 sw=4 noet
-
-import re
 
 __version__ = VERSION
 __doc__     = """
@@ -139,10 +138,10 @@ with an UPPER CASE letter or digit. That's a bit restrictive, but it makes
 it easier to highlight and spot in your source code.
 }}}"""
 
-RE_COMMAND_PASTE    = re.compile("(PASTE):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
-RE_COMMAND_CUT      = re.compile("(CUT):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
-RE_COMMAND_END      = re.compile("(END):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
-RE_COMMAND_VERBATIM = re.compile("(VERBATIM):(START|END)")
+RE_COMMAND_PASTE    = re.compile("\s*(PASTE):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
+RE_COMMAND_CUT      = re.compile("\s*(CUT):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
+RE_COMMAND_END      = re.compile("\s*(END):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
+RE_COMMAND_VERBATIM = re.compile("\s*(VERBATIM):(START|END)")
 
 COMMANDS = {
 	"PASTE": RE_COMMAND_PASTE,
@@ -180,6 +179,7 @@ You can also subclass the `litterate.Language`, in particular:
 
 class Language(object):
 
+	LINE_BASED    = False
 	# {{{
 	# `Language.RE_START:regexp`::
 	# 	The regular expression that is used to match start delimiters
@@ -203,7 +203,7 @@ class Language(object):
 	# }}}
 	ESCAPE        = [None, None]
 
-	def __init__( self, options ):
+	def __init__( self, options=None ):
 		self.newlines = options and options.newlines or True
 		self.strip    = options and options.strip    or True
 
@@ -221,7 +221,7 @@ class Language(object):
 	#	source files.
 	# }}}
 
-	def extract( self, text, start=None, end=None, strip=None, escape=None ):
+	def extract( self, text, start=None, end=None, strip=None, escape=None, lineBased=None ):
 		"""Extracts litterate string from the given text, using
 		the given `start`, `end` and `strip` regular expressions.
 
@@ -233,10 +233,13 @@ class Language(object):
 		"""
 		# {{{```}}}
 		# {{{VERBATIM:START}}}
-		start  = start  or self.RE_START
-		end    = end    or self.RE_END
-		strip  = strip  or self.RE_STRIP
-		escape = escape or self.ESCAPE
+		start     = start  or self.RE_START
+		end       = end    or self.RE_END
+		strip     = strip  or self.RE_STRIP
+		escape    = escape or self.ESCAPE
+		lineBased = self.LINE_BASED if lineBased is None else lineBased
+		assert start, "Language.extract: no start regexp given"
+		assert end,   "Language.extract: no end   regexp given"
 		block  = []
 		blocks = {"MAIN":block}
 		last_end = -1
@@ -247,7 +250,17 @@ class Language(object):
 			# end, then we continue.
 			if not e or s.end() < last_end: continue
 			t        = text[s.end():e.start()]
-			t        = "".join((_ for _ in strip.split(t) if _ is not None))
+			if self.LINE_BASED:
+				# For line-based languages, we string on a line basis
+				r = []
+				for line in t.split("\n"):
+					m = strip.match(line)
+					if m: r.append(line[m.end():])
+					else: r.append(line)
+				t = "\n".join(r)
+			else:
+				# For non-line-based languages, we strip the expressions directly
+				t        = "".join((_ for _ in strip.split(t) if _ is not None))
 			for old, new in escape: t = t.replace(old, new)
 			command = self.command(t)
 			# {{{TODO:It should still be possible to insert litterate text here}}}
@@ -336,9 +349,6 @@ class C(Language):
 	RE_STRIP      = re.compile("[ \t]*\*[ \t]?")
 	ESCAPE        = (("\\*\\/", "*/"),)
 
-class C(Language):
-	pass
-
 class JavaScript(C):
 	pass
 
@@ -376,10 +386,11 @@ if True:
 }}}"""
 
 class Python(Language):
-	RE_START = re.compile("\{\{\{")
-	RE_STRIP = re.compile("[ \t]\|[ \t]?|^[ \t]#")
-	RE_END   = re.compile("\s*\#?\s*}}"  "}")
-	ESCAPE   = (
+	LINE_BASED = True
+	RE_START   = re.compile("\{\{\{")
+	RE_STRIP   = re.compile("^\s*[\|#]\s?")
+	RE_END     = re.compile("\s*\#?\s*}}"  "}")
+	ESCAPE     = (
 		("\\}\\}\\}", "}" "}}"),
 		('\\"\\"\\"', '"""')
 	)
@@ -535,4 +546,5 @@ if __name__ == "__main__":
 				for line in language.extract(f.read()):
 					out.write(line)
 	if output: output.close()
-# EOF
+
+# EOF - vim: ts=4 sw=4 noet
