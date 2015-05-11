@@ -6,14 +6,13 @@
 # License           : BSD License
 # -----------------------------------------------------------------------------
 # Creation date     : 02-Mar-2015
-# Last modification : 23-Apr-2015
+# Last modification : 11-May-2015
 # -----------------------------------------------------------------------------
 
 import re
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 LICENSE = "http://ffctn.com/doc/licenses/bsd"
-
 
 __version__ = VERSION
 __doc__     = """
@@ -30,7 +29,7 @@ Version :  0.0.1
 URL     :  http://github.com/sebastien/litterate.py
 ```
 
-`litterate.py` extract documentation embedded in source-code files, allowing
+`litterate.py` extracts documentation embedded in source-code files, allowing
 to have both project documentation and source code in the same file.
 
 It is intended for small-sized projects where you would prefer to avoid
@@ -179,6 +178,11 @@ You can also subclass the `litterate.Language`, in particular:
 
 class Language(object):
 
+	EOLS              = "\r\n"
+	SPACES            = "\t\n"
+
+	VERBATIM_DEINDENT = True
+
 	LINE_BASED    = False
 	# {{{
 	# `Language.RE_START:regexp`::
@@ -284,7 +288,7 @@ class Language(object):
 					verbatim = e.end()
 				else:
 					# TODO: We should de-indent for Pythonic languages
-					block.append(text[max(verbatim,last_end):s.start()])
+					block.append( self._processVerbatim(text, max(verbatim,last_end), s.start(), verbatim))
 					verbatim = None
 			else:
 				raise Exception("Unsupported command: " + t)
@@ -293,6 +297,35 @@ class Language(object):
 			yield _
 		# {{{VERBATIM:END}}}
 		# {{{```}}}
+
+	def _processVerbatim( self, text, startOffset, endOffset, verbatimOffset ):
+		"""Processes the given verbatim text, de-indenting the lines
+		based on the indentation of the first verbatim text."""
+		# We extract the leading indent
+		spaces = []
+		o      = verbatimOffset - 1
+		while o >= 0 and text[o] not in self.EOLS:
+			c = text[o]
+			if c in self.SPACES:
+				spaces.append(c)
+			elif c not in self.EOLS:
+				spaces = []
+			o -= 1
+		spaces.reverse()
+		spaces = "".join(spaces)
+		# Now we split the block in lines and deindent them before joining them
+		# back. We also strip the lines that contain the stripping characters
+		block  = "\n".join(
+			self._deindent(_, spaces)  for _ in text[startOffset:endOffset].split("\n") if not self.RE_STRIP.match(_)
+		)
+		return block
+
+	def _deindent( self, line, indent ):
+		"""De-indents the given line of text."""
+		# FIXME: This is a dumb deindent
+		i = 0
+		while i < len(indent) and i < len(line) and line[i] == indent[i]: i += 1
+		return line[i:]
 
 	def _output( self, block, blocks ):
 		last      = len(block)
