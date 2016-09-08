@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding=utf8 ---------------------------------------------------------------
 # Project           : Litterate.py
 # -----------------------------------------------------------------------------
@@ -9,10 +9,10 @@
 # Last modification : 11-May-2015
 # -----------------------------------------------------------------------------
 
-import re
+import re, os, sys
 
-VERSION = "0.1.2"
-LICENSE = "http://ffctn.com/doc/licenses/bsd"
+VERSION    = "0.1.2"
+LICENSE    = "http://ffctn.com/doc/licenses/bsd"
 
 __version__ = VERSION
 __doc__     = """
@@ -21,11 +21,11 @@ delimiters and outputs it on stdout.
 """
 
 """{{{
-# Litterate.py
+\# Litterate.py
 ## A multi-language litterate programming tool
 
 ```
-Version :  0.0.1
+Version :  0.1.2
 URL     :  http://github.com/sebastien/litterate.py
 ```
 
@@ -45,23 +45,38 @@ How does it work?
 extract the content content between these delimiters. The delimiters depend
 on the language you're using.
 
-In C or JavaScript, they look like this
+In C-style languages (Java, JavaScript), it looks like this
 
 ```
 /**
-  * <TEXT THAT WILL BE EXTRACTED>
-  * ...
+  * TEXT THAT WILL BE EXTRACTED
+  * ‥
 */
 
 ```
 
-In Python, they look like this
+In shell-like or Python-like languages:
+
+```
+# {{{
+# TEXT THAT WILL BE EXTRACTED
+# ‥
+# }}}
+```
+
+In Python:
 
 ```
 \"\"\"{{{
-<TEXT THAT WILL BE EXTRACTED>
+TEXT THAT WILL BE EXTRACTED
 \}\}\}\"\"\"
+
+{{{
+TEXT THAT WILL BE EXTRACTED
+}}}
 ```
+
+In indentation:
 
 The extracted text will then be output to stdout (or to a specific file using
 the `-o` command line option). You're then free to process the output
@@ -73,12 +88,19 @@ A typical workflow would be like that
 $ litterate.py a.py b.py | pandoc -f markdown -t html README.html
 ```
 
+
 }}}"""
 
 # {{{PASTE:COMMAND_LINE}}}
 # {{{PASTE:LANGUAGES}}}
 # {{{PASTE:COMMANDS}}}
 # {{{PASTE:API}}}
+
+"""{{{
+References
+==========
+https://github.com/coffeedoc/codo
+}}}"""
 
 # -----------------------------------------------------------------------------
 #
@@ -141,6 +163,7 @@ RE_COMMAND_PASTE    = re.compile("\s*(PASTE):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
 RE_COMMAND_CUT      = re.compile("\s*(CUT):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
 RE_COMMAND_END      = re.compile("\s*(END):([A-Z][A-Z0-9_\-]*[A-Z0-9]?)")
 RE_COMMAND_VERBATIM = re.compile("\s*(VERBATIM):(START|END)")
+RE_ESCAPE           = re.compile("\\\\.")
 
 COMMANDS = {
 	"PASTE": RE_COMMAND_PASTE,
@@ -148,7 +171,6 @@ COMMANDS = {
 	"END"  : RE_COMMAND_END,
 	"VERBATIM" : RE_COMMAND_VERBATIM
 }
-
 
 
 # -----------------------------------------------------------------------------
@@ -185,23 +207,27 @@ class Language(object):
 
 	LINE_BASED    = False
 	# {{{
-	# `Language.RE_START:regexp`::
+	# `Language.RE_START:regexp`
+	# :
 	# 	The regular expression that is used to match start delimiters
 	# }}}
 	RE_START      = None
 	# {{{
-	# `Language.RE_END:regexp`::
+	# `Language.RE_END:regexp`
+	#  :
 	# 	The regular expression that is used to match end delimiters
 	# }}}
 	RE_END        = None
 	# {{{
-	# `Language.RE_STRIP:regexp`::
+	# `Language.RE_STRIP:regexp`
+	# :
 	# 	The regular expression that is used to strip pieces such as leading
 	#   `#` characters.
 	# }}}
 	RE_STRIP      = None
 	# {{{
 	# `Language.ESCAPE=[(old:String,new:String)]`
+	# :
 	#	A list of `old` strings to be replaced by `new` strings, which is
 	#	a very basic way of dealing with excaping delimiters.
 	# }}}
@@ -220,7 +246,8 @@ class Language(object):
 		return None
 
 	# {{{
-	# `Language.extract( self, text:String )`::
+	# `Language.extract( self, text:String )`
+	# :
 	#	The main algorithm that extracts the litterate text blocks from the
 	#	source files.
 	# }}}
@@ -248,6 +275,8 @@ class Language(object):
 		blocks = {"MAIN":block}
 		last_end = -1
 		verbatim = None
+		# FIXME: Stripping should be smarter and should check for a consitent
+		# pattern at the start
 		for i, s in enumerate(start.finditer(text)):
 			e = end.search(text, s.end())
 			# If we did not find an end, or that we found a start before the last
@@ -270,13 +299,13 @@ class Language(object):
 			# {{{TODO:It should still be possible to insert litterate text here}}}
 			if not command:
 				if verbatim:
-					block.append(text[max(verbatim,last_end):s.start()])
+					block.append(self._processBlock(text[max(verbatim,last_end):s.start()]))
 				# If we have the strip option, we absorb the leading newline
 				if self.strip and i == 0 and len(block) == 0 and t[0] == "\n": t = t[1:]
 				# If we have the newlines options, and the block is not empty, ends with a string,
 				# which is not the empty string, then we add it.
 				if self.newlines and i > 0 and len(block) > 0 and type(block[-1]) in (str, unicode) and not block[-1][-1] == "\n": block.append("\n")
-				block.append(t)
+				block.append(self._processBlock(t))
 			elif command[0] == "CUT":
 				block = blocks.setdefault(command[1], [])
 			elif command[0] == "END":
@@ -288,7 +317,7 @@ class Language(object):
 					verbatim = e.end()
 				else:
 					# TODO: We should de-indent for Pythonic languages
-					block.append( self._processVerbatim(text, max(verbatim,last_end), s.start(), verbatim))
+					block.append(self._processVerbatim(text, max(verbatim,last_end), s.start(), verbatim))
 					verbatim = None
 			else:
 				raise Exception("Unsupported command: " + t)
@@ -297,6 +326,16 @@ class Language(object):
 			yield _
 		# {{{VERBATIM:END}}}
 		# {{{```}}}
+
+	def _processBlock( self, text ):
+		res = []
+		o   = 0
+		for m in RE_ESCAPE.finditer(text):
+			res.append(text[o:m.start()])
+			res.append(text[m.start()+1])
+			o = m.end()
+		res.append(text[o:])
+		return "".join(res)
 
 	def _processVerbatim( self, text, startOffset, endOffset, verbatimOffset ):
 		"""Processes the given verbatim text, de-indenting the lines
@@ -318,6 +357,7 @@ class Language(object):
 		block  = "\n".join(
 			self._deindent(_, spaces)  for _ in text[startOffset:endOffset].split("\n") if not self.RE_STRIP.match(_)
 		)
+		if block and block[0] == "\n": block = block[1:]
 		return block
 
 	def _deindent( self, line, indent ):
@@ -391,14 +431,13 @@ Python
 
 The recognized extensions are `.py`. Litterate texts
 start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
-trailng spaces) will be stripped.
+trailing spaces) will be stripped.
 
 Example:
 
 ```
-# {{{CUT:ABOUT\}\}\}
-
-\"\"\"{{{
+# The following block of text will be processed as part of the documentation
+\"\"\"{{{CUT:ABOUT\}}}{{{
 Input data is acquired through _iterators_. Iterators wrap an input source
 (the default input is a `FileInput`) and a `move` callback that updates the
 iterator's offset. The iterator will build a buffer of the acquired input
@@ -406,14 +445,14 @@ and maintain a pointer for the current offset within the data acquired from
 the input stream.
 \}\}\}\"\"\"
 
-
 if True:
+	# The following will be appended to the documentation as well
 	\"\"\"{{{
-#	| You can get an iterator on a file by doing:
-#	|
-#	| ```c
-#	| Iterator* iterator = Iterator_Open("example.txt");
-#	| ```
+	| You can get an iterator on a file by doing:
+	|
+	| ```c
+	| Iterator* iterator = Iterator_Open("example.txt");
+	| ```
  	\}\}\}\"\"\"
 ```
 }}}"""
@@ -454,9 +493,9 @@ if True
 	# {{{
 	# You can get an iterator on a file by doing:
 	#
-	# ```c
+	# \\```c
 	# Iterator* iterator = Iterator_Open("example.txt");
-	# ```
+	# \\```
 	# \}\}\}
 end
 ```
@@ -464,6 +503,9 @@ end
 }}}"""
 
 class Sugar(Python):
+	pass
+
+class Paml(Python):
 	pass
 
 """{{{
@@ -495,7 +537,8 @@ LANGUAGES = {
 	"c|cpp|h" : C,
 	"js"      : JavaScript,
 	"py"      : Python,
-	"sjs|spy" : Sugar
+	"sjs|spy" : Sugar,
+	"paml"    : Paml,
 }
 
 """{{{
@@ -561,23 +604,30 @@ if __name__ == "__main__":
 	parser.add_argument("-o", "--output",   dest="output",   action="store", help="Specifies an input file, stdout is denoted by -")
 	parser.add_argument("-n", "--newlines", dest="newlines", action="store_true", default=True, help="Ensures that blocks are separated by newlines")
 	parser.add_argument("-s", "--strip",    dest="strip",    action="store_true", default=True, help="Strips leading and trailing newlines")
+	# parser.add_argument("-t", "--template", dest="template", action="store_true", default=True, help="Outputs the path to the template")
 	args = parser.parse_args()
 	output = None
 	if args.output:
 		output = file(args.output, "w")
 	out = output or out
-	# Executes the main program
-	if not args.files or args.files == ["-"]:
-		if not args.language:
-			fail("A language (-l, --language) must be specified when using stdin. Try -lc")
-		out.write(getLanguage(args.language, args).extract(sys.stdin.read()))
+	if False and args.template and not output:
+		pass
+		# path = os.path.dirname(os.path.abspath(__file__))
+		# path = os.path.expanduser("~/Projects/Public/Litterate/litterate.tmpl")
+		# # FIXME: This should be done differently
 	else:
-		for p in args.files:
-			language = args.language or getLanguage(p, args)
-			assert language, "No language registered for file: {0}. Supported extensions are {1}".format(p, ", ".join(LANGUAGES.keys()))
-			with file(p) as f:
-				for line in language.extract(f.read()):
-					out.write(line)
-	if output: output.close()
+		# Executes the main program
+		if not args.files or args.files == ["-"]:
+			if not args.language:
+				fail("A language (-l, --language) must be specified when using stdin. Try -lc")
+			out.write(getLanguage(args.language, args).extract(sys.stdin.read()))
+		else:
+			for p in args.files:
+				language = args.language or getLanguage(p, args)
+				assert language, "No language registered for file: {0}. Supported extensions are {1}".format(p, ", ".join(LANGUAGES.keys()))
+				with open(p, "r") as f:
+					for line in language.extract(f.read()):
+						out.write(line)
+		if output: output.close()
 
 # EOF - vim: ts=4 sw=4 noet

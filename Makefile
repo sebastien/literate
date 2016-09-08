@@ -1,13 +1,37 @@
-PRODUCT: README.html
+SOURCES     = $(wildcard src/*.py)
+DOC_SOURCES = $(wildcard docs/* docs/*/*)
+MANIFEST    = $(SOURCES) $(wildcard *.py api/*.* AUTHORS* README* LICENSE*)
+VERSION     = `grep -r VERSION src.py | head -n1 | cut -d '=' -f2  | xargs echo`
+OS          = `uname -s | tr A-Z a-z`
+PRODUCT     = MANIFEST README.md
+LITTERATE   = ./src/litterate.py
+
+.PHONY: all doc clean check tests
 
 all: $(PRODUCT)
-	
+
+release: $(PRODUCT)
+	git commit -a -m "Release $(VERSION)" ; true
+	git tag $(VERSION) ; true
+	git push --all ; true
+	python setup.py clean sdist register upload
+
+tests:
+	PYTHONPATH=src:$(PYTHONPATH) python tests/$(OS)/all.py
+
 clean:
-	rm -f $(PRODUCT)
+	echo $(PRODUCT) | xargs python -c 'import sys,os;sys.stdout.write("\n".join(_ for _ in sys.argv[1:] if os.path.exists(_)))' | xargs rm 
 
-README.md: litterate.py
-	./litterate.py $< > $@
+check:
+	pychecker -100 $(SOURCES)
 
-%.html: %.md
-	pandoc $< -o $@ --css texto.css
+test:
+	python tests/all.py
 
+MANIFEST: $(MANIFEST)
+	echo $(MANIFEST) | xargs -n1 | sort | uniq > $@
+
+README.md: $(LITTERATE)
+	$< $< > $@
+
+#EOF
