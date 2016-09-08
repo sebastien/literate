@@ -9,9 +9,9 @@
 # Last modification : 08-Sep-2016
 # -----------------------------------------------------------------------------
 
-import re
+import re, sys, argparse
 
-VERSION    = "0.1.2"
+VERSION    = "0.1.3"
 LICENSE    = "http://ffctn.com/doc/licenses/bsd"
 
 __version__ = VERSION
@@ -548,8 +548,8 @@ def getLanguage( filename, args ):
 #
 # -----------------------------------------------------------------------------
 
-if __name__ == "__main__":
-	import sys, argparse
+def run(args=None):
+	args = sys.argv[1:] if args is None else args
 	def fail( message ):
 		sys.stderr.write("[!] ")
 		sys.stderr.write(message)
@@ -594,7 +594,7 @@ if __name__ == "__main__":
 	parser.add_argument("-n", "--newlines", dest="newlines", action="store_true", default=True, help="Ensures that blocks are separated by newlines")
 	parser.add_argument("-s", "--strip",    dest="strip",    action="store_true", default=True, help="Strips leading and trailing newlines")
 	# parser.add_argument("-t", "--template", dest="template", action="store_true", default=True, help="Outputs the path to the template")
-	args = parser.parse_args()
+	args = parser.parse_args(args)
 	output = None
 	if args.output:
 		output = file(args.output, "w")
@@ -608,7 +608,7 @@ if __name__ == "__main__":
 		# Executes the main program
 		if not args.files or args.files == ["-"]:
 			if not args.language:
-				fail("A language (-l, --language) must be specified when using stdin. Try -lc")
+				fail("A language (-l, --language) must be specified when using stdin. Try again with -lc, or run litterate --help for more information ")
 			out.write(getLanguage(args.language, args).extract(sys.stdin.read()))
 		else:
 			for p in args.files:
@@ -618,5 +618,9 @@ if __name__ == "__main__":
 					for line in language.extract(f.read()):
 						out.write(line)
 		if output: output.close()
+
+
+if __name__ == "__main__":
+	run()
 
 # EOF - vim: ts=4 sw=4 noet

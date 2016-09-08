@@ -21,6 +21,7 @@ setup(
 	package_dir      = {"":"src"},
 	py_modules       = ["litterate"],
 	license          = "License :: OSI Approved :: BSD License",
+	scripts          = ["bin/litterate"],
 	classifiers      = [
 		"Programming Language :: Python :: 3",
 		"Development Status :: 3 - Alpha",
