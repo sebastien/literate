@@ -6,10 +6,10 @@
 # License           : BSD License
 # -----------------------------------------------------------------------------
 # Creation date     : 02-Mar-2015
-# Last modification : 11-May-2015
+# Last modification : 08-Sep-2016
 # -----------------------------------------------------------------------------
 
-import re, os, sys
+import re
 
 VERSION    = "0.1.2"
 LICENSE    = "http://ffctn.com/doc/licenses/bsd"
@@ -61,7 +61,7 @@ In shell-like or Python-like languages:
 # {{{
 # TEXT THAT WILL BE EXTRACTED
 # ‥
-# }}}
+# \}\}}
 ```
 
 In Python:
@@ -73,7 +73,7 @@ TEXT THAT WILL BE EXTRACTED
 
 {{{
 TEXT THAT WILL BE EXTRACTED
-}}}
+\}\}\}
 ```
 
 In indentation:
@@ -95,12 +95,6 @@ $ litterate.py a.py b.py | pandoc -f markdown -t html README.html
 # {{{PASTE:LANGUAGES}}}
 # {{{PASTE:COMMANDS}}}
 # {{{PASTE:API}}}
-
-"""{{{
-References
-==========
-https://github.com/coffeedoc/codo
-}}}"""
 
 # -----------------------------------------------------------------------------
 #
@@ -140,17 +134,25 @@ or in Python/Sugar:
 
 The *available commands* are the following:
 
-`CUT:<NAME>`::
-	`CUT` will not output any following litterate text until another
-	`CUT` command or a corresponding `END` command is encountered.
+<dl>
+<dt>`CUT:<NAME>`</dt>
+<dd>
+`CUT` will not output any following litterate text until another
+`CUT` command or a corresponding `END` command is encountered.
+</dd>
 
-`END:<NAME>`::
-	`END` will end the `CUT`ting of the litterate text. Any litterate
-	text after that will be output.
+<dt>`END:<NAME>`</dt>
+<dd>
+`END` will end the `CUT`ting of the litterate text. Any litterate
+text after that will be output.
+</dd>
 
-`PASTE:<NAME>`::
-	`PASTE`s the `CUT`ted litterate text block. You can `PASTE` before
-	a `CUT`, but there always need to be a corresponding `CUT`ted block.
+<dt>`PASTE:<NAME>`</dt>
+<dd>
+`PASTE`s the `CUT`ted litterate text block. You can `PASTE` before
+a `CUT`, but there always need to be a corresponding `CUT`ted block.
+</dd>
+</dl>
 
 Note that `<NAME>` in the above corresponds to a string that matches
 `[A-Z][A-Z0-9_\-]*[A-Z0-9]?`, that is starts with an UPPER CASE letter,
@@ -240,7 +242,7 @@ class Language(object):
 	def command( self, text ):
 		"""Returns a couple `(command:String, argument:String)` if the
 		given text corresponds to a Litterate command."""
-		for name, regexp in COMMANDS.items():
+		for name, regexp in list(COMMANDS.items()):
 			m = regexp.match(text)
 			if m: return m.group(1), m.group(2)
 		return None
@@ -252,7 +254,7 @@ class Language(object):
 	#	source files.
 	# }}}
 
-	def extract( self, text, start=None, end=None, strip=None, escape=None, lineBased=None ):
+	def extract( self, text, start=None, end=None, strip=None, escape=None ):
 		"""Extracts litterate string from the given text, using
 		the given `start`, `end` and `strip` regular expressions.
 
@@ -262,13 +264,10 @@ class Language(object):
 		  a litterate text line.
 
 		"""
-		# {{{```}}}
-		# {{{VERBATIM:START}}}
 		start     = start  or self.RE_START
 		end       = end    or self.RE_END
 		strip     = strip  or self.RE_STRIP
 		escape    = escape or self.ESCAPE
-		lineBased = self.LINE_BASED if lineBased is None else lineBased
 		assert start, "Language.extract: no start regexp given"
 		assert end,   "Language.extract: no end   regexp given"
 		block  = []
@@ -296,7 +295,6 @@ class Language(object):
 				t        = "".join((_ for _ in strip.split(t) if _ is not None))
 			for old, new in escape: t = t.replace(old, new)
 			command = self.command(t)
-			# {{{TODO:It should still be possible to insert litterate text here}}}
 			if not command:
 				if verbatim:
 					block.append(self._processBlock(text[max(verbatim,last_end):s.start()]))
@@ -304,7 +302,7 @@ class Language(object):
 				if self.strip and i == 0 and len(block) == 0 and t[0] == "\n": t = t[1:]
 				# If we have the newlines options, and the block is not empty, ends with a string,
 				# which is not the empty string, then we add it.
-				if self.newlines and i > 0 and len(block) > 0 and type(block[-1]) in (str, unicode) and not block[-1][-1] == "\n": block.append("\n")
+				if self.newlines and i > 0 and len(block) > 0 and type(block[-1]) is str and not block[-1][-1] == "\n": block.append("\n")
 				block.append(self._processBlock(t))
 			elif command[0] == "CUT":
 				block = blocks.setdefault(command[1], [])
@@ -324,8 +322,6 @@ class Language(object):
 			last_end = e.end()
 		for _ in self._output(blocks["MAIN"], blocks):
 			yield _
-		# {{{VERBATIM:END}}}
-		# {{{```}}}
 
 	def _processBlock( self, text ):
 		res = []
@@ -368,10 +364,8 @@ class Language(object):
 		return line[i:]
 
 	def _output( self, block, blocks ):
-		last      = len(block)
-		last_line = None
 		for i, line in enumerate(block):
-			if type(line) in (str, unicode):
+			if type(line) in (str, str):
 				yield line
 			elif line[0] == "PASTE":
 				for _ in self._output( blocks[line[1]], blocks):
@@ -433,27 +427,27 @@ The recognized extensions are `.py`. Litterate texts
 start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
 trailing spaces) will be stripped.
 
-Example:
+The following block of text will be processed as part of the documentation:
 
-```
-# The following block of text will be processed as part of the documentation
-\"\"\"{{{CUT:ABOUT\}}}{{{
+```python
+"\""{{{CUT:ABOUT\}}}{{{
 Input data is acquired through _iterators_. Iterators wrap an input source
 (the default input is a `FileInput`) and a `move` callback that updates the
 iterator's offset. The iterator will build a buffer of the acquired input
 and maintain a pointer for the current offset within the data acquired from
 the input stream.
-\}\}\}\"\"\"
+}\}}"\""
 
 if True:
 	# The following will be appended to the documentation as well
-	\"\"\"{{{
-	| You can get an iterator on a file by doing:
-	|
-	| ```c
-	| Iterator* iterator = Iterator_Open("example.txt");
-	| ```
- 	\}\}\}\"\"\"
+	"\""{\{{
+	\| You can get an iterator on a file by doing:
+	\|
+	\| ```c
+	\| Iterator* iterator = Iterator_Open("example.txt");
+	\| ```
+}\}}
+"\""
 ```
 }}}"""
 
@@ -479,24 +473,24 @@ trailng spaces) will be stripped.
 Example:
 
 ```
-# {{{CUT:ABOUT\}\}\}
+\# {{{CUT:ABOUT\}\}\}
 
-# {{{
-# Input data is acquired through _iterators_. Iterators wrap an input source
-# (the default input is a `FileInput`) and a `move` callback that updates the
-# iterator's offset. The iterator will build a buffer of the acquired input
-# and maintain a pointer for the current offset within the data acquired from
-# the input stream.
-# \}\}\}
+\# {\{{
+\# Input data is acquired through _iterators_. Iterators wrap an input source
+\# (the default input is a `FileInput`) and a `move` callback that updates the
+\# iterator's offset. The iterator will build a buffer of the acquired input
+\# and maintain a pointer for the current offset within the data acquired from
+\# the input stream.
+\# \}\}\}
 
 if True
-	# {{{
-	# You can get an iterator on a file by doing:
-	#
-	# \\```c
-	# Iterator* iterator = Iterator_Open("example.txt");
-	# \\```
-	# \}\}\}
+	\# {\{{
+	\# You can get an iterator on a file by doing:
+	\#
+	\# \\```c
+	\# Iterator* iterator = Iterator_Open("example.txt");
+	\# \\```
+	\# \}\}\}
 end
 ```
 
@@ -541,14 +535,9 @@ LANGUAGES = {
 	"paml"    : Paml,
 }
 
-"""{{{
-litterate.getLanguage(filename:String)::
-	Returns the `Language` instance that corresponds to the given extension.
-}}}
-"""
 def getLanguage( filename, args ):
 	ext = filename.rsplit(".", 1)[-1]
-	for pattern, parser in LANGUAGES.items():
+	for pattern, parser in list(LANGUAGES.items()):
 		if re.match(pattern, ext):
 			return parser(args)
 	return None
@@ -624,7 +613,7 @@ if __name__ == "__main__":
 		else:
 			for p in args.files:
 				language = args.language or getLanguage(p, args)
-				assert language, "No language registered for file: {0}. Supported extensions are {1}".format(p, ", ".join(LANGUAGES.keys()))
+				assert language, "No language registered for file: {0}. Supported extensions are {1}".format(p, ", ".join(list(LANGUAGES.keys())))
 				with open(p, "r") as f:
 					for line in language.extract(f.read()):
 						out.write(line)

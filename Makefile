@@ -29,7 +29,7 @@ test:
 	python tests/all.py
 
 MANIFEST: $(MANIFEST)
-	echo $(MANIFEST) | xargs -n1 | sort | uniq > $@
+	@echo $(MANIFEST) | xargs -n1 | sort | uniq > $@
 
 README.md: $(LITTERATE)
 	$< $< > $@
