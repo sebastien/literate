@@ -7,21 +7,21 @@ except ImportError:
     from distutils.core import setup
 
 VERSION = eval(filter(lambda _:_.startswith("VERSION"),
-    file("src/litterate.py").readlines())[0].split("=")[1])
+    file("src/literate.py").readlines())[0].split("=")[1])
 
 setup(
-	name             = "litterate",
+	name             = "literate",
 	version          = VERSION,
 	description      = "Extracts text and documentation embedded in source code",
 	author           = "Sébastien Pierre",
 	author_email     = "sebastien.pierre@gmail.com",
-	url              = "http://github.com/sebastien/litterate",
-	download_url     = "https://github.com/sebastien/litterate/tarball/%s" % (VERSION),
-	keywords         = ["documentation", "programming", "tools", "litterate", "markup"],
+	url              = "http://github.com/sebastien/literate",
+	download_url     = "https://github.com/sebastien/literate/tarball/%s" % (VERSION),
+	keywords         = ["documentation", "programming", "tools", "literate", "markup"],
 	package_dir      = {"":"src"},
-	py_modules       = ["litterate"],
+	py_modules       = ["literate"],
 	license          = "License :: OSI Approved :: BSD License",
-	scripts          = ["bin/litterate"],
+	scripts          = ["bin/literate"],
 	classifiers      = [
 		"Programming Language :: Python :: 3",
 		"Development Status :: 3 - Alpha",

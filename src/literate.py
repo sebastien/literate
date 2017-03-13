@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # encoding=utf8 ---------------------------------------------------------------
-# Project           : Litterate.py
+# Project           : Literate.py
 # -----------------------------------------------------------------------------
 # Author            : FFunction
 # License           : BSD License
@@ -16,32 +16,32 @@ LICENSE    = "http://ffctn.com/doc/licenses/bsd"
 
 __version__ = VERSION
 __doc__     = """
-A small litterate-programming tool that extracts and strips text within comment
+A small literate-programming tool that extracts and strips text within comment
 delimiters and outputs it on stdout.
 """
 
 """{{{
-\# Litterate.py
-## A multi-language litterate programming tool
+\# Literate.py
+## A multi-language literate programming tool
 
 ```
 Version :  0.1.2
-URL     :  http://github.com/sebastien/litterate.py
+URL     :  http://github.com/sebastien/literate.py
 ```
 
-`litterate.py` extracts documentation embedded in source-code files, allowing
+`literate.py` extracts documentation embedded in source-code files, allowing
 to have both project documentation and source code in the same file.
 
 It is intended for small-sized projects where you would prefer to avoid
 having the documentation and the code separate.
 
-It can also be used as a litterate programming tool where you have the source
+It can also be used as a literate programming tool where you have the source
 code presented alongside explanations.
 
 How does it work?
 =================
 
-`litterate.py` will look for specific delimiters in your source files and
+`literate.py` will look for specific delimiters in your source files and
 extract the content content between these delimiters. The delimiters depend
 on the language you're using.
 
@@ -85,7 +85,7 @@ with a tool such as `pandoc` to format it to a more readable format.
 A typical workflow would be like that
 
 ```
-$ litterate.py a.py b.py | pandoc -f markdown -t html README.html
+$ literate.py a.py b.py | pandoc -f markdown -t html README.html
 ```
 
 
@@ -112,11 +112,11 @@ Commands
 One of the typical problem you'll encounter when adding documentation in your
 source code is that the source ordering of elements (functions, classes, etc)
 might not be ideal from an explanation/documentation perspective. In other
-words, you might want some sections of your litterate text to be re-ordered
+words, you might want some sections of your literate text to be re-ordered
 on the output.
 
-To do that, `litterate.py` provides you with a few useful commands, which
-need to be the only content of a litterate text to be interpreted.
+To do that, `literate.py` provides you with a few useful commands, which
+need to be the only content of a literate text to be interpreted.
 
 For instance, in C/JavaScript:
 
@@ -137,19 +137,19 @@ The *available commands* are the following:
 <dl>
 <dt>`CUT:<NAME>`</dt>
 <dd>
-`CUT` will not output any following litterate text until another
+`CUT` will not output any following literate text until another
 `CUT` command or a corresponding `END` command is encountered.
 </dd>
 
 <dt>`END:<NAME>`</dt>
 <dd>
-`END` will end the `CUT`ting of the litterate text. Any litterate
+`END` will end the `CUT`ting of the literate text. Any literate
 text after that will be output.
 </dd>
 
 <dt>`PASTE:<NAME>`</dt>
 <dd>
-`PASTE`s the `CUT`ted litterate text block. You can `PASTE` before
+`PASTE`s the `CUT`ted literate text block. You can `PASTE` before
 a `CUT`, but there always need to be a corresponding `CUT`ted block.
 </dd>
 </dl>
@@ -188,15 +188,15 @@ COMMANDS = {
 API
 ===
 
-You can import `litterate` as a module from Python directly, and use it
-to extract litterate text from files/text.
+You can import `literate` as a module from Python directly, and use it
+to extract literate text from files/text.
 
 The module defines ready-made language parsers:
 
-- `litterate.C`, `litterate.JavaScript` for C-like languages
-- `litterate.Python`, `litterate.Sugar` for Pythonic languages
+- `literate.C`, `literate.JavaScript` for C-like languages
+- `literate.Python`, `literate.Sugar` for Pythonic languages
 
-You can also subclass the `litterate.Language`, in particular:
+You can also subclass the `literate.Language`, in particular:
 
 }}}"""
 
@@ -241,7 +241,7 @@ class Language(object):
 
 	def command( self, text ):
 		"""Returns a couple `(command:String, argument:String)` if the
-		given text corresponds to a Litterate command."""
+		given text corresponds to a Literate command."""
 		for name, regexp in list(COMMANDS.items()):
 			m = regexp.match(text)
 			if m: return m.group(1), m.group(2)
@@ -250,18 +250,18 @@ class Language(object):
 	# {{{
 	# `Language.extract( self, text:String )`
 	# :
-	#	The main algorithm that extracts the litterate text blocks from the
+	#	The main algorithm that extracts the literate text blocks from the
 	#	source files.
 	# }}}
 
 	def extract( self, text, start=None, end=None, strip=None, escape=None ):
-		"""Extracts litterate string from the given text, using
+		"""Extracts literate string from the given text, using
 		the given `start`, `end` and `strip` regular expressions.
 
-		- `start` is used to match the start of a litterate text
-		- `end` is used to match the end of a litterate text
+		- `start` is used to match the start of a literate text
+		- `end` is used to match the end of a literate text
 		- `strip` is used to match any leading text to be stripped from
-		  a litterate text line.
+		  a literate text line.
 
 		"""
 		start     = start  or self.RE_START
@@ -386,7 +386,7 @@ Supported Languages
 C, C++ & JavaScript
 -------------------
 
-The recognized extensions are `.c`, `.cpp`, `.h` and `.js`. Litterate texts
+The recognized extensions are `.c`, `.cpp`, `.h` and `.js`. Literate texts
 start with `/**` and end with `*/`. Any line starting with `*` (leading and
 trailng spaces) will be stripped.
 
@@ -423,7 +423,7 @@ class JavaScript(C):
 Python
 ------
 
-The recognized extensions are `.py`. Litterate texts
+The recognized extensions are `.py`. Literate texts
 start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
 trailing spaces) will be stripped.
 
@@ -466,7 +466,7 @@ class Python(Language):
 Sugar
 -----
 
-The recognized extensions are `.sjs` and `.spy`. Litterate texts
+The recognized extensions are `.sjs` and `.spy`. Literate texts
 start with `{{{` and end with `\}\}\}`. Any line starting with `|` (leading and
 trailng spaces) will be stripped.
 
@@ -513,7 +513,7 @@ either by using escape symbols (such as `\`) or by breaking the string in bits (
 in Python you could do `"{{" "{"` which would return a string equivalent to
 the start delimiter).
 
-If you'd like to represent a delimiter within a litterate text, you only have
+If you'd like to represent a delimiter within a literate text, you only have
 to worry about the end delimiter. The convention is to write the delimiter
 with each character prefixed by a `\`.
 
@@ -562,9 +562,9 @@ def run(args=None):
 	| Command-line tool
 	| =================
 	|
-	| `litterate.py` can be executed as a command-line tool.
+	| `literate.py` can be executed as a command-line tool.
 	|
-	| `litterate.py [OPTIONS] FILE...`
+	| `literate.py [OPTIONS] FILE...`
 	|
 	| `FILE` is optional (by default, stdin will be used). You can use `-` to
 	| explicitely read data from stding.
@@ -602,13 +602,13 @@ def run(args=None):
 	if False and args.template and not output:
 		pass
 		# path = os.path.dirname(os.path.abspath(__file__))
-		# path = os.path.expanduser("~/Projects/Public/Litterate/litterate.tmpl")
+		# path = os.path.expanduser("~/Projects/Public/Literate/literate.tmpl")
 		# # FIXME: This should be done differently
 	else:
 		# Executes the main program
 		if not args.files or args.files == ["-"]:
 			if not args.language:
-				fail("A language (-l, --language) must be specified when using stdin. Try again with -lc, or run litterate --help for more information ")
+				fail("A language (-l, --language) must be specified when using stdin. Try again with -lc, or run literate --help for more information ")
 			out.write(getLanguage(args.language, args).extract(sys.stdin.read()))
 		else:
 			for p in args.files:
