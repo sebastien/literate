@@ -4,7 +4,7 @@ MANIFEST    = $(SOURCES) $(wildcard *.py api/*.* AUTHORS* README* LICENSE*)
 VERSION     = `grep -r VERSION src.py | head -n1 | cut -d '=' -f2  | xargs echo`
 OS          = `uname -s | tr A-Z a-z`
 PRODUCT     = MANIFEST README.md
-LITTERATE   = ./src/litterate.py
+LITTERATE   = ./src/literate.py
 
 .PHONY: all doc clean check tests
 
